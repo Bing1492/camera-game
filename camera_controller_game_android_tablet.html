@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Camera Controller Game</title>
+  <style>
+    :root {
+      --bg1: #07111f;
+      --bg2: #10263f;
+      --panel: rgba(255,255,255,0.08);
+      --panelBorder: rgba(255,255,255,0.14);
+      --text: #eef5ff;
+      --muted: #b4c3d8;
+      --good: #89f0a8;
+      --warn: #ffd36a;
+      --bad: #ff7d7d;
+      --accent: #76c7ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at top, #16345a 0%, var(--bg1) 48%, #02070e 100%);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      touch-action: manipulation;
+    }
+
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      background:
+        linear-gradient(to bottom, rgba(255,255,255,0.06), rgba(255,255,255,0) 18%),
+        linear-gradient(to bottom, #10243b 0%, #081320 65%, #04080f 100%);
+    }
+
+    .hud {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      top: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--panelBorder);
+      border-radius: 16px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+    }
+
+    .stat {
+      padding: 10px 14px;
+      min-width: 92px;
+      text-align: center;
+    }
+
+    .stat .label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .stat .value {
+      font-size: 22px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    #overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: linear-gradient(to bottom, rgba(3,8,15,0.18), rgba(3,8,15,0.62));
+    }
+
+    #panel {
+      width: min(760px, 100%);
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      padding: 18px;
+      border-radius: 22px;
+      background: rgba(8, 18, 32, 0.88);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 18px 60px rgba(0,0,0,0.35);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      line-height: 1.1;
+    }
+
+    .sub {
+      margin: 0 0 14px;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    @media (min-width: 760px) {
+      .grid {
+        grid-template-columns: 1.1fr 0.9fr;
+      }
+    }
+
+    .box {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.10);
+    }
+
+    .box h2 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+
+    .box p,
+    .box li {
+      margin: 0;
+      color: #dbe8f7;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .box ul {
+      margin: 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button, select {
+      appearance: none;
+      border: 0;
+      border-radius: 14px;
+      font-size: 15px;
+    }
+
+    button {
+      padding: 12px 16px;
+      font-weight: 700;
+      color: #06213b;
+      background: linear-gradient(180deg, #9ad8ff 0%, #64bcff 100%);
+      box-shadow: 0 8px 24px rgba(63,169,255,0.35);
+    }
+
+    button.secondary {
+      color: var(--text);
+      background: rgba(255,255,255,0.10);
+      box-shadow: none;
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    select {
+      padding: 12px 14px;
+      color: var(--text);
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .statusRow {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .pill {
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--muted);
+    }
+
+    .good { color: var(--good); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+
+    #miniWrap {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      z-index: 6;
+      width: 140px;
+      pointer-events: none;
+    }
+
+    #miniCam {
+      width: 100%;
+      border-radius: 14px;
+      background: #000;
+      border: 1px solid rgba(255,255,255,0.16);
+      transform: scaleX(-1);
+      display: block;
+    }
+
+    #miniLabel {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      background: rgba(0,0,0,0.28);
+      padding: 6px 8px;
+      border-radius: 10px;
+    }
+
+    #debugBars {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .barCol {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 8px;
+    }
+
+    .barLabel {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .barTrack {
+      height: 58px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .barFill {
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(180deg, #95f2b0, #4bb8ff);
+    }
+
+    #bottomHelp {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 16px;
+      z-index: 5;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--muted);
+      background: rgba(0,0,0,0.22);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 999px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      text-align: center;
+      max-width: calc(100vw - 24px);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="hud">
+      <div class="card stat">
+        <div class="label">Score</div>
+        <div class="value" id="scoreValue">0</div>
+      </div>
+      <div class="card stat">
+        <div class="label">Best</div>
+        <div class="value" id="bestValue">0</div>
+      </div>
+      <div class="card stat">
+        <div class="label">Lives</div>
+        <div class="value" id="livesValue">3</div>
+      </div>
+    </div>
+
+    <div id="miniWrap" class="hidden">
+      <video id="miniCam" autoplay playsinline muted></video>
+      <div id="miniLabel">Camera idle</div>
+    </div>
+
+    <div id="bottomHelp">Move your hand, head, or body in the left, center, or right part of the camera view to switch lanes.</div>
+
+    <div id="overlay">
+      <div id="panel">
+        <h1>Motion Catcher</h1>
+        <p class="sub">
+          This is a single-file browser game made for Android tablets and regular browsers. Your camera becomes the controller.
+          Move in the <strong>left</strong>, <strong>center</strong>, or <strong>right</strong> side of the camera view to move your ship to that lane and catch glowing orbs.
+        </p>
+
+        <div class="grid">
+          <div class="box">
+            <h2>How to play</h2>
+            <ul>
+              <li>Tap <strong>Start camera</strong> and allow camera permission.</li>
+              <li>Stand or sit where the camera can clearly see you.</li>
+              <li>Wave a hand or move your head in one of the three screen zones.</li>
+              <li>Your ship jumps to that lane.</li>
+              <li>Catch the glowing orbs. Avoid the red blockers.</li>
+              <li>The game gets faster as your score goes up.</li>
+            </ul>
+          </div>
+
+          <div class="box">
+            <h2>Android tablet tips</h2>
+            <ul>
+              <li>Open the file in <strong>Chrome on Android</strong>.</li>
+              <li>Use <strong>HTTPS</strong> or <strong>localhost</strong>. Camera access usually will not work from an insecure page.</li>
+              <li>Good lighting helps a lot.</li>
+              <li>If front camera is blocked, switch to the back camera.</li>
+              <li>If motion feels weak, move closer or make bigger gestures.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="startCamBtn">Start camera</button>
+          <button id="startGameBtn" class="secondary">Start game</button>
+          <select id="cameraFacing">
+            <option value="user">Front camera</option>
+            <option value="environment">Back camera</option>
+          </select>
+          <button id="restartBtn" class="secondary">Restart</button>
+        </div>
+
+        <div class="statusRow">
+          <div class="pill" id="cameraStatus">Camera: not started</div>
+          <div class="pill" id="motionStatus">Motion: waiting</div>
+          <div class="pill" id="laneStatus">Lane: center</div>
+        </div>
+
+        <div id="debugBars">
+          <div class="barCol">
+            <div class="barLabel">Left</div>
+            <div class="barTrack"><div class="barFill" id="barLeft"></div></div>
+          </div>
+          <div class="barCol">
+            <div class="barLabel">Center</div>
+            <div class="barTrack"><div class="barFill" id="barCenter"></div></div>
+          </div>
+          <div class="barCol">
+            <div class="barLabel">Right</div>
+            <div class="barTrack"><div class="barFill" id="barRight"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+
+      const overlay = document.getElementById('overlay');
+      const startCamBtn = document.getElementById('startCamBtn');
+      const startGameBtn = document.getElementById('startGameBtn');
+      const restartBtn = document.getElementById('restartBtn');
+      const cameraFacing = document.getElementById('cameraFacing');
+
+      const scoreValue = document.getElementById('scoreValue');
+      const bestValue = document.getElementById('bestValue');
+      const livesValue = document.getElementById('livesValue');
+
+      const cameraStatus = document.getElementById('cameraStatus');
+      const motionStatus = document.getElementById('motionStatus');
+      const laneStatus = document.getElementById('laneStatus');
+      const miniWrap = document.getElementById('miniWrap');
+      const miniCam = document.getElementById('miniCam');
+      const miniLabel = document.getElementById('miniLabel');
+
+      const barLeft = document.getElementById('barLeft');
+      const barCenter = document.getElementById('barCenter');
+      const barRight = document.getElementById('barRight');
+
+      let width = 0;
+      let height = 0;
+      let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      window.addEventListener('resize', resize, { passive: true });
+      resize();
+
+      const video = document.createElement('video');
+      video.setAttribute('autoplay', '');
+      video.setAttribute('muted', '');
+      video.setAttribute('playsinline', '');
+      video.muted = true;
+
+      const analysisCanvas = document.createElement('canvas');
+      const analysisCtx = analysisCanvas.getContext('2d', { willReadFrequently: true });
+      analysisCanvas.width = 96;
+      analysisCanvas.height = 72;
+
+      let stream = null;
+      let cameraReady = false;
+      let prevGray = null;
+      let smoothedZones = [0, 0, 0];
+      let lastLaneSwitchAt = 0;
+      let motionState = 'waiting';
+      let detectedLane = 1;
+
+      const game = {
+        running: false,
+        over: false,
+        score: 0,
+        best: Number(localStorage.getItem('motionCatcherBest') || 0),
+        lives: 3,
+        lane: 1,
+        playerY: 0,
+        itemTimer: 0,
+        items: [],
+        stars: [],
+        speedBase: 220,
+        lastTime: performance.now()
+      };
+
+      bestValue.textContent = game.best;
+
+      function resetGame() {
+        game.running = false;
+        game.over = false;
+        game.score = 0;
+        game.lives = 3;
+        game.lane = 1;
+        game.itemTimer = 0;
+        game.items = [];
+        game.stars = [];
+        game.playerY = height - 110;
+        for (let i = 0; i < 60; i++) {
+          game.stars.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            s: Math.random() * 2 + 0.5,
+            v: Math.random() * 18 + 10
+          });
+        }
+        updateHud();
+      }
+      resetGame();
+
+      function updateHud() {
+        scoreValue.textContent = game.score;
+        livesValue.textContent = game.lives;
+        bestValue.textContent = game.best;
+      }
+
+      function laneCenterX(lane) {
+        const laneWidth = width / 3;
+        return laneWidth * lane + laneWidth / 2;
+      }
+
+      function spawnItem() {
+        const badChance = Math.min(0.35, 0.16 + game.score * 0.01);
+        const lane = Math.floor(Math.random() * 3);
+        const isBad = Math.random() < badChance;
+        game.items.push({
+          lane,
+          x: laneCenterX(lane),
+          y: -30,
+          r: isBad ? 18 : 16,
+          speed: game.speedBase + Math.min(260, game.score * 10) + Math.random() * 80,
+          bad: isBad,
+          pulse: Math.random() * Math.PI * 2
+        });
+      }
+
+      function setStatus(el, text, cls) {
+        el.textContent = text;
+        el.className = 'pill' + (cls ? ' ' + cls : '');
+      }
+
+      function setLane(nextLane) {
+        if (nextLane < 0 || nextLane > 2) return;
+        game.lane = nextLane;
+        const names = ['left', 'center', 'right'];
+        laneStatus.textContent = 'Lane: ' + names[nextLane];
+      }
+
+      async function startCamera() {
+        stopCamera();
+        prevGray = null;
+        smoothedZones = [0, 0, 0];
+        detectedLane = 1;
+        motionState = 'waiting';
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          setStatus(cameraStatus, 'Camera: unsupported browser', 'bad');
+          miniLabel.textContent = 'Camera unsupported';
+          return;
+        }
+
+        try {
+          setStatus(cameraStatus, 'Camera: requesting permission...', 'warn');
+          miniLabel.textContent = 'Requesting camera...';
+
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              facingMode: { ideal: cameraFacing.value },
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              frameRate: { ideal: 24, max: 30 }
+            }
+          });
+
+          video.srcObject = stream;
+          miniCam.srcObject = stream;
+
+          await video.play();
+          await miniCam.play();
+
+          cameraReady = true;
+          miniWrap.classList.remove('hidden');
+          setStatus(cameraStatus, 'Camera: ready', 'good');
+          miniLabel.textContent = cameraFacing.value === 'user' ? 'Front camera active' : 'Back camera active';
+          startGameBtn.classList.remove('secondary');
+        } catch (err) {
+          cameraReady = false;
+          let msg = 'Camera unavailable';
+          if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && location.protocol !== 'file:') {
+            msg = 'Use HTTPS or localhost for camera';
+          } else if (err && err.name === 'NotAllowedError') {
+            msg = 'Camera permission denied';
+          } else if (err && err.name === 'NotFoundError') {
+            msg = 'No camera found';
+          } else if (err && err.name === 'NotReadableError') {
+            msg = 'Camera busy in another app';
+          }
+          setStatus(cameraStatus, 'Camera: ' + msg, 'bad');
+          miniLabel.textContent = msg;
+        }
+      }
+
+      function stopCamera() {
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+          stream = null;
+        }
+        cameraReady = false;
+      }
+
+      function analyzeMotion() {
+        if (!cameraReady || video.readyState < 2) return;
+
+        const aw = analysisCanvas.width;
+        const ah = analysisCanvas.height;
+
+        analysisCtx.save();
+        if (cameraFacing.value === 'user') {
+          analysisCtx.translate(aw, 0);
+          analysisCtx.scale(-1, 1);
+        }
+        analysisCtx.drawImage(video, 0, 0, aw, ah);
+        analysisCtx.restore();
+
+        const frame = analysisCtx.getImageData(0, 0, aw, ah).data;
+        const gray = new Uint8Array(aw * ah);
+        for (let i = 0, p = 0; i < frame.length; i += 4, p++) {
+          gray[p] = (frame[i] * 0.299 + frame[i + 1] * 0.587 + frame[i + 2] * 0.114) | 0;
+        }
+
+        if (!prevGray) {
+          prevGray = gray;
+          return;
+        }
+
+        const zoneScores = [0, 0, 0];
+        const zoneCounts = [0, 0, 0];
+
+        for (let y = 6; y < ah - 6; y += 2) {
+          for (let x = 2; x < aw - 2; x += 2) {
+            const idx = y * aw + x;
+            const diff = Math.abs(gray[idx] - prevGray[idx]);
+            if (diff > 20) {
+              const zone = Math.min(2, Math.floor((x / aw) * 3));
+              zoneScores[zone] += diff;
+            }
+            const zone = Math.min(2, Math.floor((x / aw) * 3));
+            zoneCounts[zone]++;
+          }
+        }
+
+        prevGray = gray;
+
+        for (let z = 0; z < 3; z++) {
+          const normalized = zoneCounts[z] ? zoneScores[z] / zoneCounts[z] : 0;
+          smoothedZones[z] = smoothedZones[z] * 0.72 + normalized * 0.28;
+        }
+
+        updateBars(smoothedZones);
+
+        const maxScore = Math.max(smoothedZones[0], smoothedZones[1], smoothedZones[2]);
+        const maxLane = smoothedZones.indexOf(maxScore);
+        const threshold = 7.5;
+        const now = performance.now();
+        const runnerUp = [...smoothedZones].sort((a, b) => b - a)[1] || 0;
+
+        if (maxScore > threshold && maxScore > runnerUp * 1.15 && now - lastLaneSwitchAt > 140) {
+          detectedLane = maxLane;
+          setLane(maxLane);
+          lastLaneSwitchAt = now;
+          motionState = 'detected';
+          setStatus(motionStatus, 'Motion: detected', 'good');
+        } else if (maxScore > 3.5) {
+          motionState = 'watching';
+          setStatus(motionStatus, 'Motion: watching...', 'warn');
+        } else {
+          motionState = 'idle';
+          setStatus(motionStatus, 'Motion: idle', '');
+        }
+      }
+
+      function updateBars(values) {
+        const scaled = values.map(v => Math.max(4, Math.min(58, v * 3.8)));
+        barLeft.style.height = scaled[0] + 'px';
+        barCenter.style.height = scaled[1] + 'px';
+        barRight.style.height = scaled[2] + 'px';
+      }
+
+      function startGame() {
+        if (!cameraReady) {
+          setStatus(cameraStatus, 'Camera: start it first', 'warn');
+          return;
+        }
+        overlay.classList.add('hidden');
+        game.running = true;
+        game.over = false;
+      }
+
+      function restartGame() {
+        resetGame();
+        overlay.classList.remove('hidden');
+        setLane(1);
+      }
+
+      startCamBtn.addEventListener('click', startCamera);
+      startGameBtn.addEventListener('click', startGame);
+      restartBtn.addEventListener('click', restartGame);
+      cameraFacing.addEventListener('change', startCamera);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && game.running) {
+          overlay.classList.remove('hidden');
+          game.running = false;
+        }
+      });
+
+      canvas.addEventListener('pointerdown', () => {
+        if (!game.running && cameraReady && !game.over) {
+          overlay.classList.add('hidden');
+          game.running = true;
+        }
+      });
+
+      function drawBackground(dt) {
+        const g = ctx.createLinearGradient(0, 0, 0, height);
+        g.addColorStop(0, '#102743');
+        g.addColorStop(0.56, '#081321');
+        g.addColorStop(1, '#03070d');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, width, height);
+
+        for (const s of game.stars) {
+          s.y += s.v * dt;
+          if (s.y > height + 4) {
+            s.y = -4;
+            s.x = Math.random() * width;
+          }
+          ctx.globalAlpha = 0.5;
+          ctx.fillStyle = '#cde7ff';
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.s, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        const laneW = width / 3;
+        for (let i = 1; i < 3; i++) {
+          const x = laneW * i;
+          ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([8, 12]);
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, height);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+
+      function drawPlayer() {
+        const x = laneCenterX(game.lane);
+        const y = game.playerY;
+
+        ctx.save();
+        ctx.translate(x, y);
+
+        ctx.shadowColor = 'rgba(118,199,255,0.45)';
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = '#7fd1ff';
+        ctx.beginPath();
+        ctx.moveTo(0, -28);
+        ctx.lineTo(22, 18);
+        ctx.lineTo(0, 8);
+        ctx.lineTo(-22, 18);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#e8f7ff';
+        ctx.beginPath();
+        ctx.arc(0, -4, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      function drawItems(dt) {
+        const playerX = laneCenterX(game.lane);
+        const playerY = game.playerY;
+
+        for (let i = game.items.length - 1; i >= 0; i--) {
+          const item = game.items[i];
+          item.y += item.speed * dt;
+          item.pulse += dt * 6;
+
+          ctx.save();
+          ctx.translate(item.x, item.y);
+
+          if (item.bad) {
+            ctx.shadowColor = 'rgba(255,80,80,0.4)';
+            ctx.shadowBlur = 16;
+            ctx.fillStyle = '#ff6b6b';
+            ctx.beginPath();
+            ctx.roundRect(-16, -16, 32, 32, 8);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#fff3';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-7, -7);
+            ctx.lineTo(7, 7);
+            ctx.moveTo(7, -7);
+            ctx.lineTo(-7, 7);
+            ctx.stroke();
+          } else {
+            const scale = 1 + Math.sin(item.pulse) * 0.08;
+            ctx.scale(scale, scale);
+            ctx.shadowColor = 'rgba(255,215,100,0.55)';
+            ctx.shadowBlur = 18;
+            ctx.fillStyle = '#ffd66a';
+            ctx.beginPath();
+            ctx.arc(0, 0, item.r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fff7c8';
+            ctx.beginPath();
+            ctx.arc(-4, -5, 5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          ctx.restore();
+
+          const dx = item.x - playerX;
+          const dy = item.y - playerY;
+          const hit = Math.hypot(dx, dy) < 32;
+
+          if (hit) {
+            if (item.bad) {
+              game.lives--;
+            } else {
+              game.score++;
+              if (game.score > game.best) {
+                game.best = game.score;
+                localStorage.setItem('motionCatcherBest', String(game.best));
+              }
+            }
+            updateHud();
+            game.items.splice(i, 1);
+            continue;
+          }
+
+          if (item.y > height + 40) {
+            if (!item.bad) {
+              game.lives--;
+              updateHud();
+            }
+            game.items.splice(i, 1);
+          }
+        }
+      }
+
+      function drawCenterMessage(title, subtitle) {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.font = '700 34px Arial';
+        ctx.fillText(title, width / 2, height / 2 - 6);
+        ctx.fillStyle = 'rgba(220,233,248,0.88)';
+        ctx.font = '400 17px Arial';
+        ctx.fillText(subtitle, width / 2, height / 2 + 26);
+        ctx.restore();
+      }
+
+      function update(dt) {
+        analyzeMotion();
+
+        drawBackground(dt);
+        drawPlayer();
+
+        if (game.running) {
+          game.itemTimer -= dt;
+          const spawnEvery = Math.max(0.42, 0.95 - game.score * 0.018);
+          if (game.itemTimer <= 0) {
+            game.itemTimer = spawnEvery;
+            spawnItem();
+          }
+          drawItems(dt);
+        } else {
+          drawItems(dt);
+        }
+
+        if (!cameraReady) {
+          drawCenterMessage('Start the camera', 'Allow permission, then tap Start game.');
+        } else if (!game.running && !game.over) {
+          drawCenterMessage('Ready', 'Tap Start game, or tap the screen.');
+        }
+
+        if (game.lives <= 0 && !game.over) {
+          game.over = true;
+          game.running = false;
+          overlay.classList.remove('hidden');
+          setStatus(motionStatus, 'Motion: game over', 'bad');
+        }
+
+        if (game.over) {
+          drawCenterMessage('Game over', 'Tap Restart, then Start game again.');
+        }
+      }
+
+      function loop(now) {
+        const dt = Math.min(0.033, (now - game.lastTime) / 1000 || 0.016);
+        game.lastTime = now;
+        game.playerY = height - 110;
+        update(dt);
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+
+      window.addEventListener('beforeunload', stopCamera);
+
+      // Small fallback for browsers without Canvas roundRect.
+      if (!CanvasRenderingContext2D.prototype.roundRect) {
+        CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+          const rr = Math.min(r, w / 2, h / 2);
+          this.beginPath();
+          this.moveTo(x + rr, y);
+          this.arcTo(x + w, y, x + w, y + h, rr);
+          this.arcTo(x + w, y + h, x, y + h, rr);
+          this.arcTo(x, y + h, x, y, rr);
+          this.arcTo(x, y, x + w, y, rr);
+          this.closePath();
+          return this;
+        };
+      }
+    })();
+  </script>
+</body>
+</html>
